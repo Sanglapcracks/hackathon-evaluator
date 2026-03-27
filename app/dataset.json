@@ -1,0 +1,68 @@
+[
+  {
+    "id": 1,
+    "difficulty": "easy",
+    "features": ["login", "ui"],
+    "has_tests": false,
+    "has_docs": false,
+    "has_docker": false,
+    "stars": 2,
+    "issues": ["no tests", "no documentation"],
+    "true_score": 0.2
+  },
+  {
+    "id": 2,
+    "difficulty": "easy",
+    "features": ["todo", "crud"],
+    "has_tests": false,
+    "has_docs": true,
+    "has_docker": false,
+    "stars": 10,
+    "issues": ["no tests"],
+    "true_score": 0.4
+  },
+  {
+    "id": 3,
+    "difficulty": "medium",
+    "features": ["chat", "auth", "api"],
+    "has_tests": true,
+    "has_docs": true,
+    "has_docker": false,
+    "stars": 40,
+    "issues": ["no docker"],
+    "true_score": 0.6
+  },
+  {
+    "id": 4,
+    "difficulty": "medium",
+    "features": ["dashboard", "analytics", "charts"],
+    "has_tests": true,
+    "has_docs": false,
+    "has_docker": true,
+    "stars": 60,
+    "issues": ["missing docs"],
+    "true_score": 0.65
+  },
+  {
+    "id": 5,
+    "difficulty": "hard",
+    "features": ["ai", "recommendation", "scalable", "api"],
+    "has_tests": true,
+    "has_docs": true,
+    "has_docker": true,
+    "stars": 150,
+    "issues": [],
+    "true_score": 0.9
+  },
+  {
+    "id": 6,
+    "difficulty": "hard",
+    "features": ["ml", "pipeline", "deployment", "monitoring"],
+    "has_tests": true,
+    "has_docs": true,
+    "has_docker": true,
+    "stars": 80,
+    "issues": ["unclear documentation"],
+    "true_score": 0.8
+  }
+]
