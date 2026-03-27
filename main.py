@@ -2,7 +2,11 @@ from fastapi import FastAPI
 from app.env import HackathonEnv
 from app.models import Action
 
-app = FastAPI()
+app = FastAPI(
+    title="Hackathon Evaluator",
+    docs_url="/docs",
+    root_path="/"
+)
 
 env = HackathonEnv()
 def simple_policy(obs):
