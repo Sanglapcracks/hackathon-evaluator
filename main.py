@@ -5,6 +5,7 @@ from app.models import Action
 app = FastAPI(
     title="Hackathon Evaluator",
     docs_url="/docs",
+    openapi_url="/openapi.json",
     root_path="/"
 )
 
