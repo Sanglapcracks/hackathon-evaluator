@@ -1,3 +1,12 @@
+---
+title: Hackathon Evaluator
+emoji: 🚀
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_file: main.py
+pinned: false
+---
 # 🚀 Hackathon Project Evaluation Environment (OpenEnv)
 
 ## 📌 Overview
@@ -104,3 +113,15 @@ A simple heuristic-based agent evaluates projects based on:
 ```bash
 pip install -r requirements.txt
 uvicorn main:app --reload
+=======
+---
+title: Hackathon Evaluator
+emoji: 🦀
+colorFrom: red
+colorTo: green
+sdk: docker
+pinned: false
+---
+
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+>>>>>>> 3b5e8bb97f294dbe97cffd36cbb1ae884a1f24b7
