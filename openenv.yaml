@@ -1,14 +1,10 @@
 name: hackathon-evaluator
-
 description: >
-  An OpenEnv environment where an AI agent evaluates hackathon projects
-  based on structured features such as documentation, tests, dockerization,
-  and popularity. The agent assigns a score and provides feedback, and is
-  rewarded based on accuracy and reasoning quality.
-
+  A real-world OpenEnv environment for evaluating hackathon project submissions.
+  Agents observe structured project metadata, assign a score, and provide feedback.
 version: "1.0"
 
-entrypoint: main:app
+entrypoint: server.app:app
 
 endpoints:
   reset: /reset
@@ -27,9 +23,9 @@ observation_space:
   difficulty: string
 
 action_space:
-  score: float   # range 0–1
+  score: float
   feedback: string
 
 reward:
   type: float
-  range: [0, 1]
+  range: [0.0, 1.0]

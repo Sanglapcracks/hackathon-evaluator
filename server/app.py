@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.env import HackathonEnv
-from app.models import Action
+from server.env import HackathonEnv
+from server.models import Action
 
 app = FastAPI(
     title="Hackathon Evaluator",
@@ -117,3 +117,10 @@ def grader():
     return {
         "last_reward": env.last_reward
     }
+def main():
+    import uvicorn
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860)
+
+
+if __name__ == "__main__":
+    main()
