@@ -1,30 +1,50 @@
-def reward_fn(pred_score, true_score, feedback, issues):
-    """
-    pred_score: agent's predicted score
-    true_score: actual correct score
-    feedback: agent's explanation
-    issues: actual problems in project
-    """
-
-    # 1. Score accuracy (main signal)
+def reward_fn(pred_score, true_score, feedback, issues, difficulty="medium"):
+    # ------------------------
+    # 1. Score accuracy
+    # ------------------------
     score_reward = 1 - abs(pred_score - true_score)
 
-    # 2. Feedback correctness
+    # ------------------------
+    # 2. Feedback matching (flexible)
+    # ------------------------
+    feedback_lower = feedback.lower()
     feedback_reward = 0
+
     for issue in issues:
-        if issue.lower() in feedback.lower():
-            feedback_reward += 1
+        words = issue.lower().split()
+        for word in words:
+            if word in feedback_lower:
+                feedback_reward += 0.2
+                break
 
     if len(issues) > 0:
-        feedback_reward /= len(issues)
+        feedback_reward = min(feedback_reward, 1)
 
-    # 3. Hallucination penalty (agent mentions wrong issues)
+    # ------------------------
+    # 3. Hallucination penalty (generalized)
+    # ------------------------
     penalty = 0
-    if "security" in feedback.lower() and "security" not in issues:
-        penalty += 0.2
 
-    # 4. Final reward
-    total = (0.6 * score_reward) + (0.4 * feedback_reward) - penalty
+    common_fake_issues = ["security", "performance", "scalability"]
 
-    # Clamp between 0 and 1
-    return max(0, min(1, total))
+    for fake in common_fake_issues:
+        if fake in feedback_lower and fake not in " ".join(issues).lower():
+            penalty += 0.1
+
+    # ------------------------
+    # 4. Difficulty scaling
+    # ------------------------
+    difficulty_bonus = {
+        "easy": 1.0,
+        "medium": 1.1,
+        "hard": 1.2
+    }
+
+    base_reward = (0.6 * score_reward) + (0.4 * feedback_reward) - penalty
+
+    reward = base_reward * difficulty_bonus.get(difficulty, 1.0)
+
+    # ------------------------
+    # Clamp
+    # ------------------------
+    return max(0, min(1, reward))

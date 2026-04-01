@@ -40,7 +40,8 @@ class HackathonEnv:
             pred_score=action.score,
             true_score=true_score,
             feedback=action.feedback,
-            issues=issues
+            issues=issues,
+            difficulty=self.current["difficulty"]
         )
 
         self.last_reward = reward

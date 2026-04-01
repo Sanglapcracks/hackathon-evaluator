@@ -11,20 +11,43 @@ app = FastAPI(
 
 env = HackathonEnv()
 def simple_policy(obs):
-    score = 0.3
+    score = 0.2
 
+    # ------------------------
+    # Heuristic scoring
+    # ------------------------
     if obs["has_tests"]:
-        score += 0.2
+        score += 0.25
+
     if obs["has_docs"]:
         score += 0.2
+
     if obs["has_docker"]:
+        score += 0.15
+
+    if obs["stars"] > 100:
         score += 0.2
-    if obs["stars"] > 50:
-        score += 0.1
+
+    # ------------------------
+    # Feedback generation
+    # ------------------------
+    feedback = []
+
+    if not obs["has_tests"]:
+        feedback.append("no tests")
+
+    if not obs["has_docs"]:
+        feedback.append("no documentation")
+
+    if not obs["has_docker"]:
+        feedback.append("no docker")
+
+    if len(feedback) == 0:
+        feedback.append("well structured project")
 
     return {
         "score": min(score, 1),
-        "feedback": "basic evaluation"
+        "feedback": ", ".join(feedback)
     }
 
 @app.get("/")
@@ -69,15 +92,25 @@ def tasks():
 @app.get("/baseline")
 def baseline():
     scores = []
+    runs = []
 
     for _ in range(10):
         obs = env.reset()
-        action = simple_policy(obs.dict())
-        _, reward, _, _ = env.step(Action(**action))
+        action_dict = simple_policy(obs.dict())
+
+        obs2, reward, done, _ = env.step(Action(**action_dict))
+
         scores.append(reward)
 
+        runs.append({
+            "observation": obs.dict(),
+            "action": action_dict,
+            "reward": reward
+        })
+
     return {
-        "baseline_score": sum(scores) / len(scores)
+        "baseline_score": sum(scores) / len(scores),
+        "runs": runs
     }
 @app.get("/grader")
 def grader():
