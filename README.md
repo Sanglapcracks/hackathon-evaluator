@@ -49,3 +49,6 @@ This environment tests:
   "stars": "int",
   "difficulty": "easy | medium | hard"
 }
+## Multi-Step Adaptive Agent
+
+The environment now supports multi-step trajectories. The inference agent adapts within an episode using reward feedback and across episodes using persistent memory stored in `memory.json`. Successful trajectories are also saved in `sft_data.jsonl` for future supervised fine-tuning.

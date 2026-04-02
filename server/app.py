@@ -63,11 +63,14 @@ def reset(difficulty: str = None):
 
 @app.post("/step")
 def step(action: Action):
-    obs, reward, done, _ = env.step(action)
+    obs, reward, done, info = env.step(action)
+    obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
+
     return {
-        "observation": obs.dict(),
+        "observation": obs_dict,
         "reward": reward,
-        "done": done
+        "done": done,
+        "info": info
     }
 
 
@@ -94,18 +97,44 @@ def baseline():
     scores = []
     runs = []
 
-    for _ in range(10):
+    for _ in range(5):
         obs = env.reset()
-        action_dict = simple_policy(obs.dict())
+        done = False
+        episode_rewards = []
+        trajectory = []
+        last_reward = 0.0
 
-        obs2, reward, done, _ = env.step(Action(**action_dict))
+        while not done:
+            obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
+            action_dict = simple_policy(obs_dict)
 
-        scores.append(reward)
+            if last_reward < 0.4:
+                action_dict["score"] = max(0.0, action_dict["score"] - 0.1)
+            elif last_reward > 0.7:
+                action_dict["score"] = min(1.0, action_dict["score"] + 0.05)
+
+            next_obs, reward, done, info = env.step(Action(**action_dict))
+            next_obs_dict = next_obs.model_dump() if hasattr(next_obs, "model_dump") else next_obs.dict()
+
+            trajectory.append({
+                "observation": obs_dict,
+                "action": action_dict,
+                "reward": reward,
+                "done": done,
+                "info": info
+            })
+
+            episode_rewards.append(reward)
+            last_reward = reward
+            obs = next_obs
+
+        episode_score = sum(episode_rewards) / len(episode_rewards)
+        scores.append(episode_score)
 
         runs.append({
-            "observation": obs.dict(),
-            "action": action_dict,
-            "reward": reward
+            "episode_score": episode_score,
+            "episode_rewards": episode_rewards,
+            "trajectory": trajectory
         })
 
     return {
@@ -115,7 +144,10 @@ def baseline():
 @app.get("/grader")
 def grader():
     return {
-        "last_reward": env.last_reward
+        "last_reward": env.last_reward,
+        "done": env.done,
+        "current_step": env.current_step,
+        "max_steps": env.max_steps
     }
 def main():
     import uvicorn

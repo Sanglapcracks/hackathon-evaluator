@@ -20,6 +20,8 @@ class HackathonEnv:
         self.current = None
         self.done = False
         self.last_reward = 0.0
+        self.max_steps = 3
+        self.current_step = 0
 
     def reset(self, difficulty=None):
         if difficulty is None:
@@ -53,9 +55,13 @@ class HackathonEnv:
 
         self.done = False
         self.last_reward = 0.0
+        self.current_step = 0
         return self._get_obs()
 
     def step(self, action: Action):
+        if self.current is None:
+            raise Exception("Environment not initialized. Call /reset first.")
+
         if self.done:
             raise Exception("Episode already finished. Call reset().")
 
@@ -72,9 +78,17 @@ class HackathonEnv:
         )
 
         self.last_reward = reward
-        self.done = True
+        self.current_step += 1
 
-        return self._get_obs(), reward, self.done, {}
+        if self.current_step >= self.max_steps:
+            self.done = True
+        else:
+            self.done = False
+
+        return self._get_obs(), reward, self.done, {
+            "current_step": self.current_step,
+            "max_steps": self.max_steps
+        }
 
     def state(self):
         return self.current
