@@ -1,6 +1,5 @@
 import random
-import json
-import os
+from copy import deepcopy
 from server.models import Observation, Action
 from server.grader import reward_fn
 from server.tasks import TASKS
@@ -8,97 +7,118 @@ from server.tasks import TASKS
 
 class HackathonEnv:
     def __init__(self):
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        data_path = os.path.join(base_dir, "dataset.json")
-
-        if os.path.exists(data_path):
-            with open(data_path, "r", encoding="utf-8") as f:
-                self.data = json.load(f)
-        else:
-            self.data = []
-
         self.current = None
         self.done = False
         self.last_reward = 0.0
-        self.max_steps = 3
+        self.max_steps = 4
         self.current_step = 0
 
     def reset(self, difficulty=None):
         if difficulty is None:
             difficulty = random.choice(["easy", "medium", "hard"])
 
-        try:
-            if difficulty in TASKS and len(TASKS[difficulty]) > 0:
-                self.current = random.choice(TASKS[difficulty])
-            else:
-                filtered = [x for x in self.data if x.get("difficulty") == difficulty]
-                if filtered:
-                    self.current = random.choice(filtered)
-                elif self.data:
-                    self.current = random.choice(self.data)
-                else:
-                    raise ValueError("No tasks available")
+        if difficulty in TASKS and len(TASKS[difficulty]) > 0:
+            self.current = deepcopy(random.choice(TASKS[difficulty]))
+        else:
+            raise ValueError(f"No tasks available for difficulty: {difficulty}")
 
-            self.current["difficulty"] = difficulty
-
-        except Exception:
-            self.current = {
-                "features": [],
-                "has_tests": False,
-                "has_docs": False,
-                "has_docker": False,
-                "stars": 0,
-                "difficulty": difficulty,
-                "true_score": 0.0,
-                "issues": []
-            }
-
+        self.current["difficulty"] = difficulty
+        self.current_step = 0
         self.done = False
         self.last_reward = 0.0
-        self.current_step = 0
+
         return self._get_obs()
 
     def step(self, action: Action):
         if self.current is None:
-            raise Exception("Environment not initialized. Call /reset first.")
+            raise Exception("Environment not initialized. Call reset() first.")
 
         if self.done:
             raise Exception("Episode already finished. Call reset().")
 
-        true_score = self.current.get("true_score", 0.0)
-        issues = self.current.get("issues", [])
-        difficulty = self.current.get("difficulty", "easy")
-
-        reward = reward_fn(
-            pred_score=action.score,
-            true_score=true_score,
-            feedback=action.feedback,
-            issues=issues,
-            difficulty=difficulty
-        )
-
-        self.last_reward = reward
         self.current_step += 1
+        reward = 0.0
 
-        if self.current_step >= self.max_steps:
+        if action.action_type in [
+            "inspect_tests",
+            "inspect_docs",
+            "inspect_docker",
+            "inspect_popularity",
+        ]:
+            evidence = self.current["hidden_evidence"].get(action.action_type)
+
+            if evidence:
+                signal = evidence["signal"]
+                issue = evidence["issue"]
+
+                if signal not in self.current["revealed_signals"]:
+                    self.current["revealed_signals"].append(signal)
+                    reward += 0.05
+                else:
+                    reward -= 0.02  # repeated inspection penalty
+
+                if issue and issue not in self.current["revealed_issues"]:
+                    self.current["revealed_issues"].append(issue)
+                    reward += 0.10
+            else:
+                reward -= 0.05
+
+        elif action.action_type == "submit_final":
+            pred_score = action.score if action.score is not None else 0.0
+            feedback = action.feedback if action.feedback is not None else ""
+
+            reward = reward_fn(
+                pred_score=pred_score,
+                true_score=self.current.get("true_score", 0.0),
+                feedback=feedback,
+                issues=self.current.get("issues", []),
+                difficulty=self.current.get("difficulty", "easy")
+            )
+
+            # bonus for gathering useful evidence before final submission
+            num_signals = len(self.current["revealed_signals"])
+            num_issues = len(self.current["revealed_issues"])
+
+            if num_signals >= 2:
+                reward += 0.05
+            if num_issues >= 1:
+                reward += 0.05
+
+            # penalty for submitting too early with little evidence
+            if num_signals == 0:
+                reward -= 0.10
+
+            reward = max(0.0, min(1.0, reward))
             self.done = True
-        else:
-            self.done = False
 
-        return self._get_obs(), reward, self.done, {
+        else:
+            reward -= 0.05
+
+        if self.current_step >= self.max_steps and not self.done:
+            self.done = True
+
+        self.last_reward = max(0.0, min(1.0, reward))
+
+        return self._get_obs(), self.last_reward, self.done, {
             "current_step": self.current_step,
-            "max_steps": self.max_steps
+            "max_steps": self.max_steps,
+            "revealed_issues": self.current["revealed_issues"],
+            "revealed_signals": self.current["revealed_signals"]
         }
 
     def state(self):
         return self.current
 
     def _get_obs(self):
+        remaining_budget = self.max_steps - self.current_step
+
         return Observation(
-            features=self.current.get("features", []),
-            has_tests=self.current.get("has_tests", False),
-            has_docs=self.current.get("has_docs", False),
-            has_docker=self.current.get("has_docker", False),
-            stars=self.current.get("stars", 0),
-            difficulty=self.current.get("difficulty", "easy")
+            visible_features=self.current.get("visible_features", []),
+            revealed_issues=self.current.get("revealed_issues", []),
+            revealed_signals=self.current.get("revealed_signals", []),
+            remaining_budget=remaining_budget,
+            difficulty=self.current.get("difficulty", "easy"),
+            current_step=self.current_step,
+            max_steps=self.max_steps,
+            can_submit=self.current_step > 0
         )

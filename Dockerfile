@@ -2,11 +2,11 @@ FROM python:3.10
 
 WORKDIR /app
 
-# Copy all files
-COPY . .
+COPY requirements.txt .
 
-# Install dependencies
+RUN python -m pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose correct port for HF Spaces
+COPY . .
+
 CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]

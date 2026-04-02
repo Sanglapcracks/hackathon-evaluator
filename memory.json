@@ -1,5 +1,5 @@
 {
-  "best_score_bias": -0.05,
+  "best_score_bias": -0.15,
   "best_feedback_phrases": [],
-  "episode_count": 5
+  "episode_count": 15
 }

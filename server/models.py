@@ -1,23 +1,29 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional, Literal
 
 
-# What the agent sees
 class Observation(BaseModel):
-    features: List[str]
-    has_tests: bool
-    has_docs: bool
-    has_docker: bool
-    stars: int
+    visible_features: List[str]
+    revealed_issues: List[str]
+    revealed_signals: List[str]
+    remaining_budget: int
     difficulty: str
+    current_step: int = 0
+    max_steps: int = 4
+    can_submit: bool = False
 
 
-# What the agent outputs
 class Action(BaseModel):
-    score: float   # must be between 0 and 1
-    feedback: str  # explanation
+    action_type: Literal[
+        "inspect_tests",
+        "inspect_docs",
+        "inspect_docker",
+        "inspect_popularity",
+        "submit_final"
+    ]
+    score: Optional[float] = None
+    feedback: Optional[str] = None
 
 
-# Reward returned by environment
 class Reward(BaseModel):
     value: float
