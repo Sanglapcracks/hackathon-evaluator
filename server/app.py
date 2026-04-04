@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from server.env import HackathonEnv
 from server.models import Action
+from fastapi import Body
+from typing import Optional, Dict
 
 app = FastAPI(
     title="Hackathon Evaluator",
@@ -48,10 +50,23 @@ def home():
     return {"message": "Hackathon Evaluator Environment Running"}
 
 
-@app.get("/reset")
-def reset(difficulty: str = None):
+
+
+
+@app.post("/reset")
+def reset_post(payload: Optional[Dict] = Body(default={})):
+    difficulty = payload.get("difficulty") if payload else None
     obs = env.reset(difficulty)
     return obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
+
+
+# Keep GET for manual testing
+@app.get("/reset")
+def reset_get(difficulty: str = None):
+    obs = env.reset(difficulty)
+    return obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
+
+
 
 
 @app.post("/step")
