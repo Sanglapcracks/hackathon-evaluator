@@ -6,9 +6,9 @@ import requests
 from openai import OpenAI
 from client import HackathonEnvClient
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+API_BASE_URL = os.environ["API_BASE_URL"]
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-API_KEY = os.getenv("HF_TOKEN", "dummy-key")
+API_KEY = os.environ["API_KEY"]
 
 SPACE_URL = os.getenv(
     "SPACE_URL",
@@ -260,10 +260,12 @@ def build_final_submission(obs: dict, client: OpenAI, last_reward: float, histor
             if phrase and phrase not in feedback_parts and len(feedback_parts) < 5:
                 feedback_parts.append(phrase)
 
-    if not feedback_parts:
-        feedback_parts.append(get_model_message(client, obs))
+    model_summary = get_model_message(client, obs)
 
-    feedback = ", ".join(feedback_parts)
+    if model_summary and model_summary not in feedback_parts and len(feedback_parts) < 6:
+        feedback_parts.append(model_summary)
+
+    feedback = ", ".join(feedback_parts) if feedback_parts else model_summary
 
     previous_feedbacks = {h["action"].get("feedback", "") for h in history if "action" in h}
     if feedback in previous_feedbacks:
