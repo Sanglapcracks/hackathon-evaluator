@@ -3,6 +3,9 @@ from server.env import HackathonEnv
 from server.models import Action
 from fastapi import Body
 from typing import Optional, Dict
+from server.tasks import get_all_tasks
+from server.tasks import get_task_by_id
+from server.grader import reward_fn
 
 app = FastAPI(
     title="Hackathon Evaluator",
@@ -95,34 +98,23 @@ def state():
 
 @app.get("/tasks")
 def tasks():
+    task_list = []
+    for task in get_all_tasks():
+        task_list.append({
+            "id": task["id"],
+            "difficulty": task["difficulty"],
+            "description": f"Evaluate project with features: {', '.join(task['visible_features'])}",
+            "grader": "reward_fn"
+        })
+
     return {
-        "tasks": [
-            {
-                "id": "easy",
-                "description": "Simple projects with obvious engineering issues. Agent should inspect evidence before final submission."
-            },
-            {
-                "id": "medium",
-                "description": "Projects with mixed quality and incomplete evidence. Agent must gather evidence selectively."
-            },
-            {
-                "id": "hard",
-                "description": "Complex or deceptive projects where popularity may hide engineering gaps. Agent must reason over partial evidence."
-            }
-        ],
-        "workflow": [
-            "reset environment",
-            "inspect one or more aspects of the project",
-            "observe revealed signals and issues",
-            "submit final score and feedback"
-        ],
+        "tasks": task_list,
         "action_schema": {
             "action_type": "inspect_tests | inspect_docs | inspect_docker | inspect_popularity | submit_final",
             "score": "float (required only for submit_final)",
             "feedback": "string (required only for submit_final)"
         }
     }
-
 
 @app.get("/baseline")
 def baseline():
@@ -168,13 +160,32 @@ def baseline():
     }
 
 
-@app.get("/grader")
-def grader():
+@app.post("/grader")
+def grader(payload: Optional[Dict] = Body(default={})):
+    task_id = payload.get("task_id")
+    score = payload.get("score", 0.0)
+    feedback = payload.get("feedback", "")
+
+    task = get_task_by_id(task_id)
+    if task is None:
+        return {
+            "error": f"Unknown task_id: {task_id}"
+        }
+
+    grader_score = reward_fn(
+        pred_score=score,
+        true_score=task.get("true_score", 0.0),
+        feedback=feedback,
+        issues=task.get("issues", []),
+        difficulty=task.get("difficulty", "easy")
+    )
+
     return {
-        "last_reward": env.last_reward,
-        "done": env.done,
-        "current_step": env.current_step,
-        "max_steps": env.max_steps
+        "task_id": task_id,
+        "grader_score": grader_score,
+        "difficulty": task.get("difficulty"),
+        "true_score": task.get("true_score"),
+        "issues": task.get("issues", [])
     }
 
 
