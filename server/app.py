@@ -58,10 +58,18 @@ def home():
 
 @app.post("/reset")
 def reset_post(payload: Optional[Dict] = Body(default={})):
-    difficulty = payload.get("difficulty") if payload else None
-    task_id = payload.get("task_id") if payload else None
-    obs = env.reset(difficulty=difficulty, task_id=task_id)
-    return obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
+    try:
+        payload = payload or {}
+
+        difficulty = payload.get("difficulty", None)
+        task_id = payload.get("task_id", None)
+
+        obs = env.reset(difficulty=difficulty, task_id=task_id)
+
+        return obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
+
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # Keep GET for manual testing
