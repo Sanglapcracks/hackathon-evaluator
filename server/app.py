@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,Request
 from server.env import HackathonEnv
 from server.models import Action
 from fastapi import Body
@@ -57,22 +57,25 @@ def home():
 
 
 @app.post("/reset")
-def reset_post(payload: Optional[Dict] = Body(default={})):
+async def reset_post(request: Request):
     try:
-        payload = payload or {}
+        payload = {}
+        try:
+            payload = await request.json()
+            if payload is None:
+                payload = {}
+        except Exception:
+            payload = {}
 
-        difficulty = payload.get("difficulty", None)
-        task_id = payload.get("task_id", None)
+        difficulty = payload.get("difficulty")
+        task_id = payload.get("task_id")
 
         obs = env.reset(difficulty=difficulty, task_id=task_id)
-
         return obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
-
     except Exception as e:
-        return {"error": str(e)}
+        return {"detail": str(e)}
 
 
-# Keep GET for manual testing
 @app.get("/reset")
 def reset_get(difficulty: str = None, task_id: str = None):
     obs = env.reset(difficulty=difficulty, task_id=task_id)

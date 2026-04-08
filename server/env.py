@@ -15,32 +15,28 @@ class HackathonEnv:
         self.current_step = 0
 
     def reset(self, difficulty=None, task_id=None):
-        import random
-
         self.current_step = 0
         self.done = False
         self.last_reward = 0.0
 
         if task_id:
             task = get_task_by_id(task_id)
-            if task:
-                self.current = deepcopy(task)
-                return self._get_obs()
+            if task is None:
+                raise ValueError(f"Unknown task_id: {task_id}")
+            self.current = deepcopy(task)
+            return self._get_obs()
 
-    # fallback to random task ALWAYS
-        difficulty = difficulty or random.choice(["easy", "medium", "hard"])
+        if difficulty is None:
+            difficulty = random.choice(["easy", "medium", "hard"])
 
         if difficulty in TASKS and len(TASKS[difficulty]) > 0:
             self.current = deepcopy(random.choice(TASKS[difficulty]))
         else:
-        # FINAL fallback (IMPORTANT)
             all_tasks = []
-            for v in TASKS.values():
-                all_tasks.extend(v)
-
+            for group in TASKS.values():
+                all_tasks.extend(group)
             if not all_tasks:
                 raise ValueError("No tasks available")
-
             self.current = deepcopy(random.choice(all_tasks))
 
         return self._get_obs()
