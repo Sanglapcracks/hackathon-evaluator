@@ -3,6 +3,7 @@ from copy import deepcopy
 from server.models import Observation, Action
 from server.grader import reward_fn
 from server.tasks import TASKS
+from server.tasks import get_task_by_id
 
 
 class HackathonEnv:
@@ -13,7 +14,18 @@ class HackathonEnv:
         self.max_steps = 4
         self.current_step = 0
 
-    def reset(self, difficulty=None):
+    def reset(self, difficulty=None, task_id=None):
+        self.current_step = 0
+        self.done = False
+        self.last_reward = 0.0
+
+        if task_id:
+            task = get_task_by_id(task_id)
+            if task is None:
+                raise ValueError(f"Unknown task_id: {task_id}")
+        self.current = deepcopy(task)
+        return self._get_obs()
+
         if difficulty is None:
             difficulty = random.choice(["easy", "medium", "hard"])
 
@@ -21,11 +33,6 @@ class HackathonEnv:
             self.current = deepcopy(random.choice(TASKS[difficulty]))
         else:
             raise ValueError(f"No tasks available for difficulty: {difficulty}")
-
-        self.current["difficulty"] = difficulty
-        self.current_step = 0
-        self.done = False
-        self.last_reward = 0.0
 
         return self._get_obs()
 

@@ -59,16 +59,16 @@ def home():
 @app.post("/reset")
 def reset_post(payload: Optional[Dict] = Body(default={})):
     difficulty = payload.get("difficulty") if payload else None
-    obs = env.reset(difficulty)
+    task_id = payload.get("task_id") if payload else None
+    obs = env.reset(difficulty=difficulty, task_id=task_id)
     return obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
 
 
 # Keep GET for manual testing
 @app.get("/reset")
-def reset_get(difficulty: str = None):
-    obs = env.reset(difficulty)
+def reset_get(difficulty: str = None, task_id: str = None):
+    obs = env.reset(difficulty=difficulty, task_id=task_id)
     return obs.model_dump() if hasattr(obs, "model_dump") else obs.dict()
-
 
 
 
@@ -104,9 +104,13 @@ def tasks():
             "id": task["id"],
             "difficulty": task["difficulty"],
             "description": f"Evaluate project with features: {', '.join(task['visible_features'])}",
-            "grader": "reward_fn"
+            "grader": "reward_fn",
+            "grader_enabled": True
         })
 
+    return {
+        "tasks": task_list
+    }
     return {
         "tasks": task_list,
         "action_schema": {
@@ -168,9 +172,7 @@ def grader(payload: Optional[Dict] = Body(default={})):
 
     task = get_task_by_id(task_id)
     if task is None:
-        return {
-            "error": f"Unknown task_id: {task_id}"
-        }
+        return {"error": f"Unknown task_id: {task_id}"}
 
     grader_score = reward_fn(
         pred_score=score,
