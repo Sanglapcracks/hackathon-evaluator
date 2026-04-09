@@ -262,7 +262,8 @@ def build_final_submission(obs: dict, client: OpenAI, last_reward: float, histor
     if past_final_action and past_final_action.get("score") is not None:
         score = 0.7 * score + 0.3 * float(past_final_action["score"])
 
-    score = max(0.0, min(1.0, score))
+    EPS=1e-6
+    score=max(EPS,min(1.0-EPS,score))
 
     feedback_parts = list(revealed_issues)
 
@@ -393,7 +394,8 @@ async def main():
             elif rewards:
                 score = sum(rewards) / len(rewards)
 
-            score = max(0.0, min(1.0, score))
+            EPS=1e-6
+            score=max(EPS,min(1.0-EPS,score))
             success = score >= SUCCESS_SCORE_THRESHOLD
 
             MEMORY["episode_count"] += 1

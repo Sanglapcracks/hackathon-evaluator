@@ -5,9 +5,14 @@ class HackathonEnvClient:
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
 
-    def reset(self, difficulty: str = None):
-        params = {"difficulty": difficulty} if difficulty else {}
-        resp = requests.get(f"{self.base_url}/reset", params=params, timeout=30)
+    def reset(self, difficulty: str = None, task_id: str = None):
+        payload = {}
+        if difficulty:
+            payload["difficulty"] = difficulty
+        if task_id:
+            payload["task_id"] = task_id
+
+        resp = requests.post(f"{self.base_url}/reset", json=payload, timeout=30)
         resp.raise_for_status()
         return resp.json()
 
@@ -31,7 +36,15 @@ class HackathonEnvClient:
         resp.raise_for_status()
         return resp.json()
 
-    def grader(self):
-        resp = requests.get(f"{self.base_url}/grader", timeout=30)
+    def grader(self, task_id: str, score: float, feedback: str):
+        resp = requests.post(
+            f"{self.base_url}/grader",
+            json={
+                "task_id": task_id,
+                "score": score,
+                "feedback": feedback,
+            },
+            timeout=30,
+        )
         resp.raise_for_status()
         return resp.json()
