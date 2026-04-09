@@ -54,18 +54,23 @@ if os.path.exists(MEMORY_FILE):
         pass
 
 
-def force_proxy_call(client: OpenAI) -> None:
-    completion = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": "You are a hackathon judge."},
-            {"role": "user", "content": "Reply with exactly: ok"}
-        ],
-        temperature=0,
-        max_tokens=5,
-    )
-    _ = completion.choices[0].message.content
-
+def force_proxy_call(client: OpenAI) -> bool:
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": "You are a hackathon judge."},
+                {"role": "user", "content": "Reply with exactly: ok"}
+            ],
+            temperature=0,
+            max_tokens=5,
+        )
+        _ = completion.choices[0].message.content
+        print("[DEBUG] Forced proxy call succeeded", flush=True)
+        return True
+    except Exception as exc:
+        print(f"[DEBUG] Forced proxy call failed: {exc}", flush=True)
+        return False
 
 def log_start(task, env, model):
     print(f"[START] task={task} env={env} model={model}", flush=True)
@@ -106,7 +111,7 @@ def get_model_message(client: OpenAI, obs: dict) -> str:
         return text if text else "basic evaluation"
     except Exception as exc:
         print(f"[DEBUG] Model request failed: {exc}", flush=True)
-        raise
+        return "basic evaluation"
 def load_past_trajectories():
     if not os.path.exists(TRAJECTORY_FILE):
         return []
@@ -323,7 +328,10 @@ def build_action(obs: dict, client: OpenAI, last_reward: float = 0.0, history: L
 async def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     env_client=HackathonEnvClient(SPACE_URL)
-    force_proxy_call(client)
+    print(f"[DEBUG] Using proxy base URL: {API_BASE_URL}", flush=True)
+    _ = force_proxy_call(client)
+    
+    
 
     rewards: List[float] = []
     history: List[dict] = []
