@@ -8,7 +8,7 @@ from client import HackathonEnvClient
 
 API_BASE_URL = os.environ["API_BASE_URL"]
 API_KEY = os.environ["API_KEY"]
-MODEL_NAME = os.environ["MODEL_NAME","gpt-4o-mini"]
+MODEL_NAME = os.environ.get["MODEL_NAME","gpt-4o-mini"]
 
 SPACE_URL = os.getenv(
     "SPACE_URL",
