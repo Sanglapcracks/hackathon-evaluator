@@ -7,8 +7,8 @@ from openai import OpenAI
 from client import HackathonEnvClient
 
 API_BASE_URL = os.environ["API_BASE_URL"]
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 API_KEY = os.environ["API_KEY"]
+MODEL_NAME = os.environ["MODEL_NAME"]
 
 SPACE_URL = os.getenv(
     "SPACE_URL",
@@ -54,6 +54,19 @@ if os.path.exists(MEMORY_FILE):
         pass
 
 
+def force_proxy_call(client: OpenAI) -> None:
+    completion = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": "You are a hackathon judge."},
+            {"role": "user", "content": "Reply with exactly: ok"}
+        ],
+        temperature=0,
+        max_tokens=5,
+    )
+    _ = completion.choices[0].message.content
+
+
 def log_start(task, env, model):
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
@@ -93,7 +106,7 @@ def get_model_message(client: OpenAI, obs: dict) -> str:
         return text if text else "basic evaluation"
     except Exception as exc:
         print(f"[DEBUG] Model request failed: {exc}", flush=True)
-        return "basic evaluation"
+        raise
 def load_past_trajectories():
     if not os.path.exists(TRAJECTORY_FILE):
         return []
@@ -310,6 +323,7 @@ def build_action(obs: dict, client: OpenAI, last_reward: float = 0.0, history: L
 async def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
     env_client=HackathonEnvClient(SPACE_URL)
+    force_proxy_call(client)
 
     rewards: List[float] = []
     history: List[dict] = []
