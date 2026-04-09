@@ -6,9 +6,9 @@ import requests
 from openai import OpenAI
 from client import HackathonEnvClient
 
-API_BASE_URL = os.environ["API_BASE_URL"]
-API_KEY = os.environ["API_KEY"]
-MODEL_NAME = os.environ.get["MODEL_NAME","gpt-4o-mini"]
+API_BASE_URL = os.environ["API_BASE_URL"]   # REQUIRED
+API_KEY = os.environ["API_KEY"]             # REQUIRED
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")  # OPTIONAL
 
 SPACE_URL = os.getenv(
     "SPACE_URL",
