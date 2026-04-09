@@ -327,136 +327,154 @@ def build_action(obs: dict, client: OpenAI, last_reward: float = 0.0, history: L
 
 async def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
-    env_client=HackathonEnvClient(SPACE_URL)
+    env_client = HackathonEnvClient(SPACE_URL)
+
     print(f"[DEBUG] Using proxy base URL: {API_BASE_URL}", flush=True)
     _ = force_proxy_call(client)
-    
-    
 
-    rewards: List[float] = []
-    history: List[dict] = []
-    steps_taken = 0
-    score = 0.0
-    success = False
-    last_reward = 0.0
+    tasks_response = env_client.tasks()
+    task_items = tasks_response.get("tasks", [])[:3]
 
-    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
+    if not task_items:
+        raise RuntimeError("No tasks returned from /tasks")
 
-    try:
-        obs = env_client.reset()
+    for task in task_items:
+        task_id = task["id"]
 
-        done = False
+        rewards: List[float] = []
+        history: List[dict] = []
+        steps_taken = 0
+        score = 0.0
+        success = False
+        last_reward = 0.0
+        final_action = None
+        obs = {}
 
-        for step in range(1, MAX_STEPS + 1):
-            if done:
-                break
-
-            action = build_action(obs, client, last_reward=last_reward, history=history)
-
-            result = env_client.step(action)
-
-            reward = float(result.get("reward", 0.0))
-            done = bool(result.get("done", False))
-            obs = result.get("observation", obs)
-
-            rewards.append(reward)
-            steps_taken = step
-            last_reward = reward
-
-            history.append({
-                "step": step,
-                "action": action,
-                "reward": reward
-            })
-
-            log_step(step=step, action=action, reward=reward, done=done, error=None)
-
-            if done:
-                break
-
-        if rewards:
-            score = sum(rewards) / len(rewards)
-
-        score = max(0.0, min(1.0, score))
-        success = score >= SUCCESS_SCORE_THRESHOLD
-
-        MEMORY["episode_count"] += 1
-
-        if score > 0.7:
-            MEMORY["best_score_bias"] = min(MEMORY["best_score_bias"] + 0.02, 0.15)
-
-            for item in history:
-                action_feedback = item.get("action", {}).get("feedback", "")
-                for phrase in action_feedback.split(","):
-                    phrase = phrase.strip()
-                    if phrase and phrase not in MEMORY["best_feedback_phrases"]:
-                        MEMORY["best_feedback_phrases"].append(phrase)
-        else:
-            MEMORY["best_score_bias"] = max(MEMORY["best_score_bias"] - 0.01, -0.15)
-        learning_rate = 0.05
-
-        if score > 0.7:
-            POLICY["has_tests_weight"] = min(0.4, POLICY["has_tests_weight"] + learning_rate * 0.5)
-            POLICY["has_docs_weight"] = min(0.35, POLICY["has_docs_weight"] + learning_rate * 0.4)
-            POLICY["has_docker_weight"] = min(0.3, POLICY["has_docker_weight"] + learning_rate * 0.3)
-            POLICY["stars_weight"] = min(0.3, POLICY["stars_weight"] + learning_rate * 0.2)
-        else:
-            POLICY["has_tests_weight"] = max(0.05, POLICY["has_tests_weight"] - learning_rate * 0.2)
-            POLICY["has_docs_weight"] = max(0.05, POLICY["has_docs_weight"] - learning_rate * 0.2)
-            POLICY["has_docker_weight"] = max(0.05, POLICY["has_docker_weight"] - learning_rate * 0.15)
-            POLICY["stars_weight"] = max(0.05, POLICY["stars_weight"] - learning_rate * 0.1)
+        log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
         try:
-            with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-                json.dump(MEMORY, f, indent=2)
-            print(f"[DEBUG] MEMORY SAVED → {MEMORY_FILE}", flush=True)
-        except Exception as e:
-            print(f"[DEBUG] Failed to save memory: {e}", flush=True)
-        try:
-            with open(POLICY_FILE, "w", encoding="utf-8") as f:
-                json.dump(POLICY, f, indent=2)
-            print(f"[DEBUG] POLICY SAVED → {POLICY_FILE}", flush=True)
-        except Exception as e:
-            print(f"[DEBUG] Failed to save policy: {e}", flush=True)
+            obs = env_client.reset(task_id=task_id)
+            done = False
 
-        try:
-            with open(TRAJECTORY_FILE, "a", encoding="utf-8") as f:
-                record = {
-                    "task": TASK_NAME,
-                    "model": MODEL_NAME,
-                    "success": success,
-                    "score": score,
-                    "rewards": rewards,
-                    "history": history,
-                    "fingerprint":build_fingerprint(obs)
-                }
-                f.write(json.dumps(record) + "\n")
-            print(f"[DEBUG] TRAJECTORY SAVED → {TRAJECTORY_FILE}", flush=True)
-        except Exception as e:
-            print(f"[DEBUG] Failed to save trajectory: {e}", flush=True)
+            for step in range(1, MAX_STEPS + 1):
+                if done:
+                    break
 
-        if success or score > 0.7:
+                action = build_action(obs, client, last_reward=last_reward, history=history)
+                result = env_client.step(action)
+
+                reward = float(result.get("reward", 0.0))
+                done = bool(result.get("done", False))
+                obs = result.get("observation", obs)
+
+                rewards.append(reward)
+                steps_taken = step
+                last_reward = reward
+                final_action = action
+
+                history.append({
+                    "step": step,
+                    "action": action,
+                    "reward": reward
+                })
+
+                log_step(step=step, action=action, reward=reward, done=done, error=None)
+
+                if done:
+                    break
+
+            if final_action and final_action.get("action_type") == "submit_final":
+                grader_result = env_client.grader(
+                    task_id=task_id,
+                    score=float(final_action.get("score", 0.0)),
+                    feedback=str(final_action.get("feedback", "")),
+                )
+                score = float(grader_result.get("grader_score", 0.0))
+            elif rewards:
+                score = sum(rewards) / len(rewards)
+
+            score = max(0.0, min(1.0, score))
+            success = score >= SUCCESS_SCORE_THRESHOLD
+
+            MEMORY["episode_count"] += 1
+
+            if score > 0.7:
+                MEMORY["best_score_bias"] = min(MEMORY["best_score_bias"] + 0.02, 0.15)
+
+                for item in history:
+                    action_feedback = item.get("action", {}).get("feedback", "")
+                    for phrase in action_feedback.split(","):
+                        phrase = phrase.strip()
+                        if phrase and phrase not in MEMORY["best_feedback_phrases"]:
+                            MEMORY["best_feedback_phrases"].append(phrase)
+            else:
+                MEMORY["best_score_bias"] = max(MEMORY["best_score_bias"] - 0.01, -0.15)
+
+            learning_rate = 0.05
+
+            if score > 0.7:
+                POLICY["has_tests_weight"] = min(0.4, POLICY["has_tests_weight"] + learning_rate * 0.5)
+                POLICY["has_docs_weight"] = min(0.35, POLICY["has_docs_weight"] + learning_rate * 0.4)
+                POLICY["has_docker_weight"] = min(0.3, POLICY["has_docker_weight"] + learning_rate * 0.3)
+                POLICY["stars_weight"] = min(0.3, POLICY["stars_weight"] + learning_rate * 0.2)
+            else:
+                POLICY["has_tests_weight"] = max(0.05, POLICY["has_tests_weight"] - learning_rate * 0.2)
+                POLICY["has_docs_weight"] = max(0.05, POLICY["has_docs_weight"] - learning_rate * 0.2)
+                POLICY["has_docker_weight"] = max(0.05, POLICY["has_docker_weight"] - learning_rate * 0.15)
+                POLICY["stars_weight"] = max(0.05, POLICY["stars_weight"] - learning_rate * 0.1)
+
             try:
-                with open(SFT_FILE, "a", encoding="utf-8") as f:
-                    sft_record = {
-                        "input": {
-                            "task": TASK_NAME,
-                            "history": history[:-1] if len(history) > 1 else [],
-                            "final_observation": obs
-                        },
-                        "output": history[-1]["action"] if history else {},
-                        "score": score
-                    }
-                    f.write(json.dumps(sft_record) + "\n")
-                print(f"[DEBUG] SFT SAMPLE SAVED → {SFT_FILE}", flush=True)
+                with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+                    json.dump(MEMORY, f, indent=2)
+                print(f"[DEBUG] MEMORY SAVED → {MEMORY_FILE}", flush=True)
             except Exception as e:
-                print(f"[DEBUG] Failed to save SFT sample: {e}", flush=True)
+                print(f"[DEBUG] Failed to save memory: {e}", flush=True)
 
-    except Exception as exc:
-        print(f"[DEBUG] inference failed: {exc}", flush=True)
+            try:
+                with open(POLICY_FILE, "w", encoding="utf-8") as f:
+                    json.dump(POLICY, f, indent=2)
+                print(f"[DEBUG] POLICY SAVED → {POLICY_FILE}", flush=True)
+            except Exception as e:
+                print(f"[DEBUG] Failed to save policy: {e}", flush=True)
 
-    finally:
-        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+            try:
+                with open(TRAJECTORY_FILE, "a", encoding="utf-8") as f:
+                    record = {
+                        "task": task_id,
+                        "model": MODEL_NAME,
+                        "success": success,
+                        "score": score,
+                        "rewards": rewards,
+                        "history": history,
+                        "fingerprint": build_fingerprint(obs)
+                    }
+                    f.write(json.dumps(record) + "\n")
+                print(f"[DEBUG] TRAJECTORY SAVED → {TRAJECTORY_FILE}", flush=True)
+            except Exception as e:
+                print(f"[DEBUG] Failed to save trajectory: {e}", flush=True)
+
+            if success or score > 0.7:
+                try:
+                    with open(SFT_FILE, "a", encoding="utf-8") as f:
+                        sft_record = {
+                            "input": {
+                                "task": task_id,
+                                "history": history[:-1] if len(history) > 1 else [],
+                                "final_observation": obs
+                            },
+                            "output": history[-1]["action"] if history else {},
+                            "score": score
+                        }
+                        f.write(json.dumps(sft_record) + "\n")
+                    print(f"[DEBUG] SFT SAMPLE SAVED → {SFT_FILE}", flush=True)
+                except Exception as e:
+                    print(f"[DEBUG] Failed to save SFT sample: {e}", flush=True)
+
+        except Exception as exc:
+            print(f"[DEBUG] inference failed for task {task_id}: {exc}", flush=True)
+
+        finally:
+            log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 if __name__ == "__main__":
