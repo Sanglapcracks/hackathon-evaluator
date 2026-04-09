@@ -1,50 +1,19 @@
-def reward_fn(pred_score, true_score, feedback, issues, difficulty="medium"):
-    # ------------------------
-    # 1. Score accuracy
-    # ------------------------
+def reward_fn(pred_score, true_score, feedback, issues, difficulty="easy"):
     score_reward = 1 - abs(pred_score - true_score)
 
-    # ------------------------
-    # 2. Feedback matching (flexible)
-    # ------------------------
-    feedback_lower = feedback.lower()
-    feedback_reward = 0
-
+    feedback_reward = 0.0
     for issue in issues:
-        words = issue.lower().split()
-        for word in words:
-            if word in feedback_lower:
-                feedback_reward += 0.2
-                break
+        if issue.lower() in feedback.lower():
+            feedback_reward += 1.0
 
     if len(issues) > 0:
-        feedback_reward = min(feedback_reward, 1)
+        feedback_reward /= len(issues)
 
-    # ------------------------
-    # 3. Hallucination penalty (generalized)
-    # ------------------------
-    penalty = 0
+    penalty = 0.0
+    if "security" in feedback.lower() and "security" not in [i.lower() for i in issues]:
+        penalty += 0.2
 
-    common_fake_issues = ["security", "performance", "scalability"]
+    total = (0.6 * score_reward) + (0.4 * feedback_reward) - penalty
 
-    for fake in common_fake_issues:
-        if fake in feedback_lower and fake not in " ".join(issues).lower():
-            penalty += 0.1
-
-    # ------------------------
-    # 4. Difficulty scaling
-    # ------------------------
-    difficulty_bonus = {
-        "easy": 1.0,
-        "medium": 1.1,
-        "hard": 1.2
-    }
-
-    base_reward = (0.6 * score_reward) + (0.4 * feedback_reward) - penalty
-
-    reward = base_reward * difficulty_bonus.get(difficulty, 1.0)
-
-    # ------------------------
-    # Clamp
-    # ------------------------
-    return max(0, min(1, reward))
+    EPS = 1e-6
+    return max(EPS, min(1.0 - EPS, total))
